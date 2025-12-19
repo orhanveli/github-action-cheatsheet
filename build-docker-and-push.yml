@@ -90,6 +90,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # build-args: |
+          #   APP_FOLDER=my-other-app
 
       # Optional: Update GitOps repo with new image tag
       # Uncomment and configure if you want automatic deployments
