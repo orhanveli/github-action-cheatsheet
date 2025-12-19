@@ -1,3 +1,5 @@
+name: Cleanup Old Docker Images
+
 on:
   workflow_dispatch:
   schedule:
