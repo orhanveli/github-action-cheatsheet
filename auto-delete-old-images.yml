@@ -14,8 +14,8 @@ jobs:
           owner-type: org # or user
           token: ${{ secrets.GITHUB_TOKEN }}
           repository_owner: ${{ github.repository_owner }}
-          package-name: eys-mobile-hub-dotnet
+          package-name: my-app
           delete-untagged: true
           keep-at-most: 5
           filter-tags: v*
-          skip-tags: latest,main,buildcache
+          skip-tags: latest,main,develop,buildcache

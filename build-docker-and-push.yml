@@ -31,7 +31,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  APP_NAME: eys-mobile-hub-dotnet
+  APP_NAME: my-app
 
 jobs:
   build:
@@ -84,7 +84,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./EYS.GatewayService/Dockerfile
+          file: ./path/to/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -97,7 +97,7 @@ jobs:
 #      - name: Update GitOps repo (development)
 #        if: github.event_name != 'pull_request'
 #        env:
-#          GITOPS_REPO: RxMediaPharmaDevs/infra-gitops
+#          GITOPS_REPO: OrgName/infra-gitops
 #          APP_NAME: ${{ env.APP_NAME }}
 #          ENVIRONMENT: ${{ inputs.environment }}
 #        run: |
