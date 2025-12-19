@@ -1,0 +1,21 @@
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *" # every day
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    name: Delete old test images
+    steps:
+      # https://github.com/marketplace/actions/ghcr-cleaner
+      - uses: quartx-analytics/ghcr-cleaner@v1
+        with:
+          owner-type: org # or user
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository_owner: ${{ github.repository_owner }}
+          package-name: eys-mobile-hub-dotnet
+          delete-untagged: true
+          keep-at-most: 5
+          filter-tags: v*
+          skip-tags: latest,main,buildcache
