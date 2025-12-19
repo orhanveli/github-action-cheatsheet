@@ -1,0 +1,9 @@
+name: Trigger only specified file have changed
+
+on:
+  push:
+    branches: [develop]
+    tags: ["v*"]
+    paths:
+      - "filerun/**"
+      - ".github/workflows/filerun-build-docker-and-push.yml"
