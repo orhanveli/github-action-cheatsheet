@@ -10,14 +10,68 @@ jobs:
     runs-on: ubuntu-latest
     name: Delete old test images
     steps:
-      # https://github.com/marketplace/actions/ghcr-cleaner
-      - uses: quartx-analytics/ghcr-cleaner@v1
+      - name: Delete old container images
+        uses: actions/github-script@v7
         with:
-          owner-type: org # or user
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository-owner: ${{ github.repository_owner }}
-          package-name: my-app
-          delete-untagged: true
-          keep-at-most: 5
-          filter-tags: v*
-          skip-tags: latest,main,develop,buildcache
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const packageName = 'your-package-name';
+            const keepLatest = 5;
+
+            // Get all versions
+            const versions = await github.paginate(
+              github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+              {
+                org: owner,
+                package_type: 'container',
+                package_name: packageName,
+                per_page: 100
+              }
+            );
+
+            // Group by tags
+            const taggedVersions = {};
+            const untaggedVersions = [];
+
+            for (const v of versions) {
+              const tags = v.metadata?.container?.tags || [];
+              if (tags.length === 0) {
+                untaggedVersions.push(v);
+              } else {
+                for (const tag of tags) {
+                  if (!taggedVersions[tag]) taggedVersions[tag] = [];
+                  taggedVersions[tag].push(v);
+                }
+              }
+            }
+
+            // Delete old tagged versions (keep 5 per tag)
+            for (const [tag, tagVersions] of Object.entries(taggedVersions)) {
+              const sorted = tagVersions.sort((a, b) => 
+                new Date(b.created_at) - new Date(a.created_at)
+              );
+              for (const v of sorted.slice(keepLatest)) {
+                console.log(`Deleting ${tag}: ${v.id}`);
+                await github.rest.packages.deletePackageVersionForOrg({
+                  org: owner,
+                  package_type: 'container',
+                  package_name: packageName,
+                  package_version_id: v.id
+                });
+              }
+            }
+
+            // Delete old untagged versions (keep 5)
+            const sortedUntagged = untaggedVersions.sort((a, b) => 
+              new Date(b.created_at) - new Date(a.created_at)
+            );
+            for (const v of sortedUntagged.slice(keepLatest)) {
+              console.log(`Deleting untagged: ${v.id}`);
+              await github.rest.packages.deletePackageVersionForOrg({
+                org: owner,
+                package_type: 'container',
+                package_name: packageName,
+                package_version_id: v.id
+              });
+            }
