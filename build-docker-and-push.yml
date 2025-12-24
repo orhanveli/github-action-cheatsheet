@@ -25,7 +25,7 @@ on:
           - development
           - production
       tag:
-        description: "Image tag (e.g., v1.0.0, latest)"
+        description: "Image tag (e.g., 1.0.0, latest)"
         required: true
         default: "latest"
 
@@ -96,25 +96,25 @@ jobs:
       # Optional: Update GitOps repo with new image tag
       # Uncomment and configure if you want automatic deployments
       #
-#      - name: Update GitOps repo (development)
-#        if: github.event_name != 'pull_request'
-#        env:
-#          GITOPS_REPO: OrgName/infra-gitops
-#          APP_NAME: ${{ env.APP_NAME }}
-#          ENVIRONMENT: ${{ inputs.environment }}
-#        run: |
-#          # Clone gitops repo
-#          git clone https://x-access-token:${{ secrets.GITOPS_TOKEN }}@github.com/$GITOPS_REPO.git gitops
-#          cd gitops
-#
-#          # Update image tag in all yaml files within the app folder
-#          IMAGE_TAG=${{ github.sha }}
-#          find clusters/${ENVIRONMENT}/apps/${APP_NAME} -name "*.yaml" -exec \
-#            sed -i "s|image: ghcr.io/.*/${APP_NAME}:.*|image: ghcr.io/${{ github.repository }}:${IMAGE_TAG}|" {} \;
-#
-#          # Commit and push
-#          git config user.name "GitHub Actions"
-#          git config user.email "actions@github.com"
-#          git add .
-#          git commit -m "Update ${APP_NAME} to ${IMAGE_TAG}" || exit 0
-#          git push
+      # - name: Update GitOps repo (hetzner-development)
+      #   if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+      #   env:
+      #     GITOPS_REPO: ${{ github.repository_owner }}/infra-gitops
+      #     APP_NAME: ${{ env.APP_NAME }}
+      #   run: |
+      #     # Clone gitops repo
+      #     rm -rf gitops
+      #     git clone https://x-access-token:${{ secrets.PAT }}@github.com/$GITOPS_REPO.git gitops
+      #     cd gitops
+
+      #     # Update image tag in all yaml files within the app folder
+      #     IMAGE_TAG=${{ github.sha }}
+      #     find clusters/hetzner-development/apps/${APP_NAME} -name "*.yaml" -exec \
+      #       sed -i "s|image: ghcr.io/.*/${APP_NAME}:.*|image: ghcr.io/${{ github.repository_owner }}/${APP_NAME}:${IMAGE_TAG}|" {} \;
+
+      #     # Commit and push
+      #     git config user.name "GitHub Actions"
+      #     git config user.email "actions@github.com"
+      #     git add .
+      #     git commit -m "Update ${APP_NAME} to ${IMAGE_TAG}" || exit 0
+      #     git push

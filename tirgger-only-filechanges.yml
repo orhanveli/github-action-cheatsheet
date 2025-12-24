@@ -4,6 +4,9 @@ on:
   push:
     branches: [develop]
     tags: ["v*"]
+    # the paths filter is ignored for tag-based triggers.
+    # From GitHub Actions docs: paths filter only applies to branches, not to tags.
+    # When you create a tag (like v1.0.0), it triggers regardless of which files changed.
     paths:
       - "filerun/**"
       - ".github/workflows/filerun-build-docker-and-push.yml"

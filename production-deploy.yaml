@@ -1,0 +1,58 @@
+name: SUT Kontrol controller-server Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (e.g., 1.0.4, latest). If prefixed with 'v', it will be trimmed."
+        required: true
+        default: "latest"
+
+env:
+  REGISTRY: ghcr.io
+  APP_NAME: sut-kontrol-controller-server
+
+jobs:
+  deploy:
+    runs-on: [self-hosted]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Prepare image tag
+        id: prepare
+        run: |
+          INPUT_TAG="${{ inputs.tag }}"
+
+          # If tag starts with 'v', trim it for docker image version
+          if [[ "$INPUT_TAG" == v* ]]; then
+            IMAGE_TAG="${INPUT_TAG#v}"
+          else
+            IMAGE_TAG="$INPUT_TAG"
+          fi
+
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "Using image tag: $IMAGE_TAG"
+
+      - name: Update GitOps repo (vmind-production)
+        env:
+          GITOPS_REPO: ${{ github.repository_owner }}/infra-gitops
+          APP_NAME: ${{ env.APP_NAME }}
+        run: |
+          # Clone gitops repo
+          rm -rf gitops
+          git clone https://x-access-token:${{ secrets.PAT }}@github.com/$GITOPS_REPO.git gitops
+          cd gitops
+
+          # Update image tag in all yaml files within the app folder
+          IMAGE_TAG=${{ steps.prepare.outputs.image_tag }}
+          find clusters/vmind-production/apps/${APP_NAME} -name "*.yaml" -exec \
+            sed -i "s|image: ghcr.io/rxmediapharmadevs/${APP_NAME}:.*|image: ghcr.io/rxmediapharmadevs/${APP_NAME}:${IMAGE_TAG}|" {} \;
+
+          # Commit and push
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Update ${APP_NAME} to ${IMAGE_TAG}" || exit 0
+          git push
