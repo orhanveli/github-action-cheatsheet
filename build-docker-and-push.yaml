@@ -108,7 +108,7 @@ jobs:
       #     cd gitops
 
       #     # Update image tag in all yaml files within the app folder
-      #     IMAGE_TAG=${{ github.sha }}
+      #     IMAGE_TAG=$(echo "${{ github.sha }}" | cut -c1-7)
       #     find clusters/hetzner-development/apps/${APP_NAME} -name "*.yaml" -exec \
       #       sed -i "s|image: ghcr.io/.*/${APP_NAME}:.*|image: ghcr.io/${{ github.repository_owner }}/${APP_NAME}:${IMAGE_TAG}|" {} \;
 
