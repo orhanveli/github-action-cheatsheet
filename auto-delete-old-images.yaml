@@ -8,6 +8,8 @@ on:
 jobs:
   clean:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     name: Delete old test images
     steps:
       - name: Delete old container images
@@ -17,7 +19,19 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const packageName = 'your-package-name';
-            const keepLatest = 5;
+            const keepHashTaggedCount = 5;
+
+            // Tags to always preserve (semantic versions, branch names)
+            const isProtectedTag = (tag) => {
+              // Keep semantic versions like 1.0.0, 1.0.1, v1.2.3, etc.
+              if (/^v?\d+\.\d+(\.\d+)?$/.test(tag)) return true;
+              // Keep branch tags
+              if (['latest', 'main', 'master', 'develop', 'development'].includes(tag)) return true;
+              return false;
+            };
+
+            // Check if tag looks like a commit hash (7+ hex characters)
+            const isHashTag = (tag) => /^[a-f0-9]{7,40}$/.test(tag);
 
             // Get all versions
             const versions = await github.paginate(
@@ -30,48 +44,82 @@ jobs:
               }
             );
 
-            // Group by tags
-            const taggedVersions = {};
+            console.log(`Found ${versions.length} total versions`);
+
+            // Categorize versions
+            const protectedVersionIds = new Set();
+            const hashTaggedVersions = [];
             const untaggedVersions = [];
 
             for (const v of versions) {
               const tags = v.metadata?.container?.tags || [];
+
               if (tags.length === 0) {
                 untaggedVersions.push(v);
+                continue;
+              }
+
+              // Check if any tag is protected
+              const hasProtectedTag = tags.some(isProtectedTag);
+              if (hasProtectedTag) {
+                protectedVersionIds.add(v.id);
+                console.log(`Protected (version/branch tag): ${tags.join(', ')}`);
+                continue;
+              }
+
+              // Check if it only has hash tags
+              const allHashTags = tags.every(isHashTag);
+              if (allHashTags) {
+                hashTaggedVersions.push(v);
               } else {
-                for (const tag of tags) {
-                  if (!taggedVersions[tag]) taggedVersions[tag] = [];
-                  taggedVersions[tag].push(v);
-                }
+                // Unknown tag pattern - protect it to be safe
+                protectedVersionIds.add(v.id);
+                console.log(`Protected (unknown tag pattern): ${tags.join(', ')}`);
               }
             }
 
-            // Delete old tagged versions (keep 5 per tag)
-            for (const [tag, tagVersions] of Object.entries(taggedVersions)) {
-              const sorted = tagVersions.sort((a, b) => 
-                new Date(b.created_at) - new Date(a.created_at)
-              );
-              for (const v of sorted.slice(keepLatest)) {
-                console.log(`Deleting ${tag}: ${v.id}`);
+            console.log(`Protected versions: ${protectedVersionIds.size}`);
+            console.log(`Hash-tagged versions: ${hashTaggedVersions.length}`);
+            console.log(`Untagged versions: ${untaggedVersions.length}`);
+
+            // Sort hash-tagged by date, keep latest N
+            const sortedHashTagged = hashTaggedVersions.sort((a, b) =>
+              new Date(b.created_at) - new Date(a.created_at)
+            );
+
+            const hashTaggedToDelete = sortedHashTagged.slice(keepHashTaggedCount);
+            console.log(`Will delete ${hashTaggedToDelete.length} old hash-tagged versions`);
+
+            for (const v of hashTaggedToDelete) {
+              const tags = v.metadata?.container?.tags || [];
+              console.log(`Deleting hash-tagged: ${tags.join(', ')} (${v.id})`);
+              try {
                 await github.rest.packages.deletePackageVersionForOrg({
                   org: owner,
                   package_type: 'container',
                   package_name: packageName,
                   package_version_id: v.id
                 });
+              } catch (err) {
+                console.log(`Failed to delete ${v.id}: ${err.message}`);
               }
             }
 
-            // Delete old untagged versions (keep 5)
-            const sortedUntagged = untaggedVersions.sort((a, b) => 
-              new Date(b.created_at) - new Date(a.created_at)
-            );
-            for (const v of sortedUntagged.slice(keepLatest)) {
+            // Delete all untagged versions (these are usually orphaned layers)
+            console.log(`Will delete ${untaggedVersions.length} untagged versions`);
+
+            for (const v of untaggedVersions) {
               console.log(`Deleting untagged: ${v.id}`);
-              await github.rest.packages.deletePackageVersionForOrg({
-                org: owner,
-                package_type: 'container',
-                package_name: packageName,
-                package_version_id: v.id
-              });
+              try {
+                await github.rest.packages.deletePackageVersionForOrg({
+                  org: owner,
+                  package_type: 'container',
+                  package_name: packageName,
+                  package_version_id: v.id
+                });
+              } catch (err) {
+                console.log(`Failed to delete ${v.id}: ${err.message}`);
+              }
             }
+
+            console.log('Cleanup complete!');
